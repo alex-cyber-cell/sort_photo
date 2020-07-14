@@ -22,14 +22,21 @@
 ##  IMPORTS
 ########################################################################################################################
 
-import sys, getopt, logging, argparse, os
+import sys, getopt, logging, argparse, os, datetime
+
+from PIL import Image
 
 ########################################################################################################################
 ##  FUNCTION DEFINITION
 ########################################################################################################################
 class Photo:
-    def __init__():
-        print("photo class has been initialsed")
+    def __init__(self, path):
+        print('classPhoto: (init) Executed ...')
+        self.photoPath = path
+        self.cDate = self.getCreationDate()
+
+    def getCreationDate(self):
+        return Image.open(self.photoPath)._getexif()[36867].split(' ')[0].replace(':','')
 
 ########################################################################################################################
 ##  FUNCTION DEFINITION
@@ -50,6 +57,28 @@ def createDateFolder():
     #function to check if folder for given date exists in target location and 
     #creates it if not 
     print('createDateFolder: Executed ...')
+
+def getFiles(src):
+    #function to generate a list of files that we need to sort
+    print('getFiles: Executed ...')
+    print('getFiles: Creating empty list ...')
+    LOF = []
+    print('getFiles: Concatenating files ...')
+    for root, subdirs, files in os.walk(src):
+        for fl in files:
+            LOF.append('/'.join([root,fl]))
+    return LOF
+
+def copyFilesAcross(LOF,dest):
+    print('copyFilesAcross: Executed ...')
+    print('copyFilesAcross: Creating list of objects for photos')
+    objs = []
+    for fl in LOF:
+        if(fl.split('.')[-1] == 'jpg'):
+            objs.append(Photo(fl))
+        else:
+            print('copyFilesAcross: Not implemented for extension: ' + fl.split('.')[-1])
+
 
 def getCmdLineArguments():
     #function to get command line arguments
@@ -77,7 +106,12 @@ def getCmdLineArguments():
     return args
 
 def main ():
-    dictVal = getCmdLineArguments()
+    #get command line arguments
+    cmdlineArgs = getCmdLineArguments()
+    #get all the files in folder
+    listOfFiles = getFiles(cmdlineArgs.sourceDirectory)
+    #get meta of photo and copy across
+    copyFilesAcross(listOfFiles,cmdlineArgs.destDirectory)
 
 ########################################################################################################################
 ##  MAIN
