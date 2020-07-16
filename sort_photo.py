@@ -12,29 +12,31 @@
 ##     USEFUL LINKS
 ########################################################################################################################
 #Logging - https://www.toptal.com/python/in-depth-python-logging
-
+#Tags for exif - https://pillow.readthedocs.io/en/stable/_modules/PIL/TiffTags.html?highlight=datetime
+#Tags definition for exif - https://www.awaresystems.be/imaging/tiff/tifftags/datetime.html
 
 ########################################################################################################################
 ##     GLOBAL VARIABLES
-########################################################################################################################
-
-########################################################################################################################
-##     ENVIRONMENT VARIABLES
 ########################################################################################################################
 fileFrmt = {'jpg'  : 'jpg',
             'JPEG' : 'jpg',
             'JPG'  : 'jpg',
             'mp4'  : 'mp4'}
+
+########################################################################################################################
+##     ENVIRONMENT VARIABLES
+########################################################################################################################
+
 ########################################################################################################################
 ##     IMPORTS
 ########################################################################################################################
 
-import sys, getopt, logging, argparse, os, datetime, shutil
+import sys, getopt, logging, argparse, os, datetime, shutil, pymediainfo
 
 from PIL import Image
 
 ########################################################################################################################
-##     FUNCTION DEFINITION
+##     CLASS DEFINITION
 ########################################################################################################################
 class Photo:
     def __init__(self, path, dest):
@@ -49,7 +51,21 @@ class Photo:
 
     def getCreationDate(self):
         #get the date of creation
-        return Image.open(self.photoSource)._getexif()[36867].split(' ')[0].replace(':','')
+        #36867 - DateTimeOriginal : The date and time when the original image data was generated
+        #36868 - DateTimeDigitized : The date and time when the image was stored as digital data
+        #306 - DateTime : the date and time of iamge creation. In this standard it is the date and time the file was changed
+        #If 36867 and 36868 are missing use 306
+        exifData = Image.open(self.photoSource)._getexif()
+        if(36867 in exifData.keys()):
+            tag = 36867
+        elif(36868 in exifData.keys()):
+            tag = 36868
+        elif(306 in exifData.keys()):
+            tag = 306
+        else:
+            tag = None
+
+        return exifData[tag].split(' ')[0].replace(':','')
 
     def createPath(self):
         #create the necessary directory where the file will be copied
@@ -61,6 +77,32 @@ class Photo:
         print("class[Photo]|Method[copyFile]: Copying file " + (self.photoSource.split('/')[-1]) + " to " + self.photoDest)
         self.createPath()
         shutil.copy(self.photoSource, self.photoDest)
+
+class Mov:
+    def __init__(self, path, dest):
+        self.movSource = path
+        self.coreDest = dest
+        self.cDate = self.getCreationDate()
+        self.movDest = self.buildDestPath()
+
+    def buildDestPath(self):
+        #create a destination path
+        return self.coreDest + self.cDate + '/'
+
+    def getCreationDate(self):
+        #get the date of creation using pymediainfo
+        return pymediainfo.MediaInfo.parse(self.movSource).tracks[0].encoded_date.split(' ')[1].replace('-','')
+
+    def createPath(self):
+        #create the necessary directory where the file will be copied
+        print("class[Mov]|Method[copyFile]: Creating directory " + self.movDest)
+        os.makedirs(self.movDest, exist_ok=True)
+
+    def copyFile(self):
+        #method to copy the file across
+        print("class[Mov]|Method[copyFile]: Copying file " + (self.movSource.split('/')[-1]) + " to " + self.movDest)
+        self.createPath()
+        shutil.copy(self.movSource, self.movDest)
 
 ########################################################################################################################
 ##     FUNCTION DEFINITION
@@ -95,8 +137,6 @@ def getFiles(src):
 
 def copyFilesAcross(LOF,dest):
     print('copyFilesAcross: Executed ...')
-    #print('copyFilesAcross: Creating list of objects for photos')
-    #objs = []
     for fl in LOF:
         #get the file format
         fFrmt = fl.split('.')[-1]
@@ -108,12 +148,17 @@ def copyFilesAcross(LOF,dest):
         #execute specific class based on type
         if( fFrmt == 'jpg'):
             #objs.append(Photo(fl, dest))
-            photo = Photo(fl, dest)
-            photo.copyFile()
+            photoObj = Photo(fl, dest)
+            photoObj.copyFile()
         elif (fFrmt == 'mp4'):
-            print("Not Yet Implemented for " + fFrmt)
+            #print("Not Yet Implemented for " + fFrmt)
+            movObj = Mov(fl, dest)
+            movObj.copyFile()
         else:
-            print("Not yet Implemented for " + fFrmt)
+            print("No handler for format " + fFrmt + ". Copying in extension named folder ...")
+            dst = dest + fFrmt + '/'
+            os.makedirs(dst, exist_ok=True)
+            shutil.copy(fl,dst)
 
 
 def getCmdLineArguments():
