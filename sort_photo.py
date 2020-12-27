@@ -32,6 +32,7 @@ fileFrmt = {'jpg'  : 'jpg',
 ########################################################################################################################
 
 import sys, getopt, logging, argparse, os, datetime, shutil, pymediainfo
+import pandas as pd
 
 from PIL import Image
 
@@ -135,6 +136,19 @@ def getFiles(src):
             LOF.append('/'.join([root,fl]))
     return LOF
 
+def createDF(LOF, dest):
+    print('Creating dataframe of files to be copied ...')
+    dfCols = ['date', 'source', 'destination']
+    print('Creating empty dataframe ...')
+    FDF = pd.DataFrame(columns = dfCols)
+    print('Populating dataframe ...')
+    for f in LOF:
+        photo = Photo(f, dest)
+        FDF.loc[len(FDF)] = [photo.getCreationDate(), f, photo.buildDestPath()]
+    print('Sorting data frame by date ...')
+    FDF = FDF.sort_values(by=['date'])
+    return FDF
+
 def copyFilesAcross(LOF,dest):
     print('copyFilesAcross: Executed ...')
     for fl in LOF:
@@ -159,7 +173,6 @@ def copyFilesAcross(LOF,dest):
             dst = dest + fFrmt + '/'
             os.makedirs(dst, exist_ok=True)
             shutil.copy(fl,dst)
-
 
 def getCmdLineArguments():
     #function to get command line arguments
@@ -191,8 +204,10 @@ def main ():
     cmdlineArgs = getCmdLineArguments()
     #get all the files in folder
     listOfFiles = getFiles(cmdlineArgs.sourceDirectory)
+    #create dataframe of files which needs to be copied
+    filesDF = createDF(listOfFiles, cmdlineArgs.destDirectory)
     #get meta of photo and copy across
-    copyFilesAcross(listOfFiles,cmdlineArgs.destDirectory)
+    copyFilesAcross(listOfFiles, cmdlineArgs.destDirectory)
 
 ########################################################################################################################
 ##  MAIN
