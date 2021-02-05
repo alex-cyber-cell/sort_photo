@@ -18,10 +18,10 @@
 ########################################################################################################################
 ##     GLOBAL VARIABLES
 ########################################################################################################################
-fileFrmt = {'jpg'  : 'jpg',
-            'JPEG' : 'jpg',
-            'JPG'  : 'jpg',
-            'mp4'  : 'mp4'}
+fileFrmt = {'jpg'  : 'Photo',
+            'JPEG' : 'Photo',
+            'JPG'  : 'Photo',
+            'mp4'  : 'Mov'}
 
 ########################################################################################################################
 ##     ENVIRONMENT VARIABLES
@@ -33,6 +33,7 @@ fileFrmt = {'jpg'  : 'jpg',
 
 import sys, getopt, logging, argparse, os, datetime, shutil, pymediainfo
 import pandas as pd
+from multiprocessing import Process, current_process
 
 from PIL import Image
 
@@ -41,10 +42,10 @@ from PIL import Image
 ########################################################################################################################
 class Photo:
     def __init__(self, path, dest):
-        self.photoSource = path
+        self.itemSource = path
         self.coreDest = dest
         self.cDate = self.getCreationDate()
-        self.photoDest = self.buildDestPath()
+        self.itemDest = self.buildDestPath()
 
     def buildDestPath(self):
         #create a destination path
@@ -56,7 +57,7 @@ class Photo:
         #36868 - DateTimeDigitized : The date and time when the image was stored as digital data
         #306 - DateTime : the date and time of iamge creation. In this standard it is the date and time the file was changed
         #If 36867 and 36868 are missing use 306
-        exifData = Image.open(self.photoSource)._getexif()
+        exifData = Image.open(self.itemSource)._getexif()
         if(36867 in exifData.keys()):
             tag = 36867
         elif(36868 in exifData.keys()):
@@ -70,21 +71,21 @@ class Photo:
 
     def createPath(self):
         #create the necessary directory where the file will be copied
-        print("class[Photo]|Method[copyFile]: Creating directory " + self.photoDest)
-        os.makedirs(self.photoDest, exist_ok=True)
+        print("class[Photo]|Method[copyFile]: Creating directory " + self.itemDest)
+        os.makedirs(self.itemDest, exist_ok=True)
 
     def copyFile(self):
         #method to copy the file across
-        print("class[Photo]|Method[copyFile]: Copying file " + (self.photoSource.split('/')[-1]) + " to " + self.photoDest)
+        print("class[Photo]|Method[copyFile]: Copying file " + (self.itemSource.split('/')[-1]) + " to " + self.itemDest)
         self.createPath()
-        shutil.copy(self.photoSource, self.photoDest)
+        shutil.copy(self.itemSource, self.itemDest)
 
 class Mov:
     def __init__(self, path, dest):
-        self.movSource = path
+        self.itemSource = path
         self.coreDest = dest
         self.cDate = self.getCreationDate()
-        self.movDest = self.buildDestPath()
+        self.itemDest = self.buildDestPath()
 
     def buildDestPath(self):
         #create a destination path
@@ -92,18 +93,18 @@ class Mov:
 
     def getCreationDate(self):
         #get the date of creation using pymediainfo
-        return pymediainfo.MediaInfo.parse(self.movSource).tracks[0].encoded_date.split(' ')[1].replace('-','')
+        return pymediainfo.MediaInfo.parse(self.itemSource).tracks[0].encoded_date.split(' ')[1].replace('-','')
 
     def createPath(self):
         #create the necessary directory where the file will be copied
-        print("class[Mov]|Method[copyFile]: Creating directory " + self.movDest)
-        os.makedirs(self.movDest, exist_ok=True)
+        print("class[Mov]|Method[copyFile]: Creating directory " + self.itemDest)
+        os.makedirs(self.itemDest, exist_ok=True)
 
     def copyFile(self):
         #method to copy the file across
-        print("class[Mov]|Method[copyFile]: Copying file " + (self.movSource.split('/')[-1]) + " to " + self.movDest)
+        print("class[Mov]|Method[copyFile]: Copying file " + (self.itemSource.split('/')[-1]) + " to " + self.itemDest)
         self.createPath()
-        shutil.copy(self.movSource, self.movDest)
+        shutil.copy(self.itemSource, self.itemDest)
 
 ########################################################################################################################
 ##     FUNCTION DEFINITION
@@ -143,36 +144,28 @@ def createDF(LOF, dest):
     FDF = pd.DataFrame(columns = dfCols)
     print('Populating dataframe ...')
     for f in LOF:
-        photo = Photo(f, dest)
-        FDF.loc[len(FDF)] = [photo.getCreationDate(), f, photo.buildDestPath()]
+        inst = getattr(sys.modules[__name__],fileFrmt[f.split('.')[-1]])(f, dest)
+        FDF.loc[len(FDF)] = [inst.getCreationDate(), f, inst.buildDestPath()]
     print('Sorting data frame by date ...')
     FDF = FDF.sort_values(by=['date'])
     return FDF
 
-def copyFilesAcross(LOF,dest):
-    print('copyFilesAcross: Executed ...')
-    for fl in LOF:
-        #get the file format
-        fFrmt = fl.split('.')[-1]
-        #if mapping exist map, otherwise inform
-        if(fFrmt in fileFrmt.keys()):
-            fFrmt = fileFrmt[fFrmt]
-        else:
-            print("Mapping does not exist for " + fFrmt)
-        #execute specific class based on type
-        if( fFrmt == 'jpg'):
-            #objs.append(Photo(fl, dest))
-            photoObj = Photo(fl, dest)
-            photoObj.copyFile()
-        elif (fFrmt == 'mp4'):
-            #print("Not Yet Implemented for " + fFrmt)
-            movObj = Mov(fl, dest)
-            movObj.copyFile()
-        else:
-            print("No handler for format " + fFrmt + ". Copying in extension named folder ...")
-            dst = dest + fFrmt + '/'
-            os.makedirs(dst, exist_ok=True)
-            shutil.copy(fl,dst)
+def copyFilesAcross(lst):
+    #keep only the date provided as parameter
+    df = lst[0]
+    dt = lst[1]
+    for d in dt:
+        subDf = df[df.date == d]
+        print("Processing date " + d + ' for PID: ', os.getpid())
+        for index,row in subDf.iterrows():
+            try:
+                #print('Making directory ' + row['destination'])
+                os.makedirs(row['destination'], exist_ok=True)
+                shutil.copy(row['source'], row['destination'])
+            except OSError as e:
+                print('Failed to copy file ' + row['source'] + ' with error {0}'.format(e) )
+            except:
+                print("Unexpected error: ", sys.exc_info()[0])
 
 def getCmdLineArguments():
     #function to get command line arguments
@@ -199,18 +192,26 @@ def getCmdLineArguments():
         print('Log folder is now set to ' + args.logDirectory)
     return args
 
-def main ():
+########################################################################################################################
+##  MAIN
+########################################################################################################################
+if __name__ == "__main__":
     #get command line arguments
     cmdlineArgs = getCmdLineArguments()
     #get all the files in folder
     listOfFiles = getFiles(cmdlineArgs.sourceDirectory)
     #create dataframe of files which needs to be copied
     filesDF = createDF(listOfFiles, cmdlineArgs.destDirectory)
-    #get meta of photo and copy across
-    copyFilesAcross(listOfFiles, cmdlineArgs.destDirectory)
+    processes = []
+    lstOfDates = list(set(filesDF['date'].to_list()))
+    lstOfDates.sort()
+    splitListOfDatesForProc = [(lstOfDates[i:i+3]) for i in range(0, len(lstOfDates), 3)]
+    for dt in splitListOfDatesForProc:
+        p = Process(target=copyFilesAcross, args=([filesDF, dt],))
+        processes.append(p)
+        p.start()
 
-########################################################################################################################
-##  MAIN
-########################################################################################################################
-if __name__ == "__main__":
-    main()
+    for p in processes:
+        p.join()
+
+
