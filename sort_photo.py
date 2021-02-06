@@ -15,6 +15,7 @@
 #Tags for exif - https://pillow.readthedocs.io/en/stable/_modules/PIL/TiffTags.html?highlight=datetime
 #Tags definition for exif - https://www.awaresystems.be/imaging/tiff/tifftags/datetime.html
 
+
 ########################################################################################################################
 ##     GLOBAL VARIABLES
 ########################################################################################################################
