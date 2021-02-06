@@ -100,17 +100,6 @@ class Photo:
         else:
             return 'None'
 
-    def createPath(self):
-        #create the necessary directory where the file will be copied
-        print("class[Photo]|Method[copyFile]: Creating directory " + self.itemDest)
-        os.makedirs(self.itemDest, exist_ok=True)
-
-    def copyFile(self):
-        #method to copy the file across
-        print("class[Photo]|Method[copyFile]: Copying file " + (self.itemSource.split('/')[-1]) + " to " + self.itemDest)
-        self.createPath()
-        shutil.copy(self.itemSource, self.itemDest)
-
 class Mov:
     def __init__(self, path, dest):
         self.itemSource = path
@@ -134,18 +123,6 @@ class Mov:
             dt = medDetails.file_last_modification_date.split(' ')[1].replace('-','')
 
         return dt
-
-    def createPath(self):
-        #create the necessary directory where the file will be copied
-        print("class[Mov]|Method[copyFile]: Creating directory " + self.itemDest)
-        os.makedirs(self.itemDest, exist_ok=True)
-
-    def copyFile(self):
-        #method to copy the file across
-        print("class[Mov]|Method[copyFile]: Copying file " + (self.itemSource.split('/')[-1]) + " to " + self.itemDest)
-        self.createPath()
-        shutil.copy(self.itemSource, self.itemDest)
-
 ########################################################################################################################
 ##     FUNCTION DEFINITION
 ########################################################################################################################
@@ -160,11 +137,6 @@ def getNecessarySpace():
 def compareSpace():
     #function to compare the necessary and avaialble space
     print('compareSpace: Executed ...')
-    
-def createDateFolder():
-    #function to check if folder for given date exists in target location and 
-    #creates it if not 
-    print('createDateFolder: Executed ...')
 
 def getFiles(src):
     #function to generate a list of files that we need to sort
