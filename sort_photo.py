@@ -21,7 +21,15 @@
 fileFrmt = {'jpg'  : 'Photo',
             'JPEG' : 'Photo',
             'JPG'  : 'Photo',
-            'mp4'  : 'Mov'}
+            'jpeg' : 'Photo',
+            'mp4'  : 'Mov',
+            'pdf'  : 'GENERIC',
+            'txt'  : 'GENERIC',
+            'xlsx' : 'GENERIC',
+            'csv'  : 'GENERIC',
+            'zip'  : 'GENERIC',
+            'doc'  : 'GENERIC',
+            'docx' : 'GENERIC'}
 
 ########################################################################################################################
 ##     ENVIRONMENT VARIABLES
@@ -40,6 +48,19 @@ from PIL import Image
 ########################################################################################################################
 ##     CLASS DEFINITION
 ########################################################################################################################
+class GENERIC:
+    def __init__(self, path, dest):
+        self.itemSource = path
+        self.coreDest = dest
+        self.cDate = self.getCreationDate()
+        self.itemDest = self.buildDestPath()
+
+    def buildDestPath(self):
+        return self.coreDest + self.itemSource.split('.')[-1].upper() + '/'
+
+    def getCreationDate(self):
+        return 'None'
+
 class Photo:
     def __init__(self, path, dest):
         self.itemSource = path
@@ -49,7 +70,8 @@ class Photo:
 
     def buildDestPath(self):
         #create a destination path
-        return self.coreDest + self.cDate + '/'
+        dt = 'UNDATED' if self.cDate is 'None' else self.cDate
+        return self.coreDest + dt + '/'
 
     def getCreationDate(self):
         #get the date of creation
@@ -57,17 +79,26 @@ class Photo:
         #36868 - DateTimeDigitized : The date and time when the image was stored as digital data
         #306 - DateTime : the date and time of iamge creation. In this standard it is the date and time the file was changed
         #If 36867 and 36868 are missing use 306
-        exifData = Image.open(self.itemSource)._getexif()
-        if(36867 in exifData.keys()):
-            tag = 36867
-        elif(36868 in exifData.keys()):
-            tag = 36868
-        elif(306 in exifData.keys()):
-            tag = 306
-        else:
-            tag = None
+        try:
+            exifData = Image.open(self.itemSource)._getexif()
+        except:
+            return 'None'
 
-        return exifData[tag].split(' ')[0].replace(':','')
+        tag = None
+
+        if not exifData is None:
+            if(36867 in exifData.keys()):
+                tag = 36867
+            elif(36868 in exifData.keys()):
+                tag = 36868
+            elif(306 in exifData.keys()):
+                tag = 306
+            else:
+                tag = None
+
+            return 'None' if tag is None else exifData[tag].split(' ')[0].replace(':', '')
+        else:
+            return 'None'
 
     def createPath(self):
         #create the necessary directory where the file will be copied
@@ -93,7 +124,16 @@ class Mov:
 
     def getCreationDate(self):
         #get the date of creation using pymediainfo
-        return pymediainfo.MediaInfo.parse(self.itemSource).tracks[0].encoded_date.split(' ')[1].replace('-','')
+        dt = 'None'
+        medDetails = pymediainfo.MediaInfo.parse(self.itemSource).tracks[0]
+        medArgs = medDetails.to_data()
+        medArgs = list(medArgs)
+        if 'encoded_date' in medArgs:
+            dt = medDetails.encoded_date.split(' ')[1].replace('-','')
+        else:
+            dt = medDetails.file_last_modification_date.split(' ')[1].replace('-','')
+
+        return dt
 
     def createPath(self):
         #create the necessary directory where the file will be copied
@@ -144,8 +184,11 @@ def createDF(LOF, dest):
     FDF = pd.DataFrame(columns = dfCols)
     print('Populating dataframe ...')
     for f in LOF:
-        inst = getattr(sys.modules[__name__],fileFrmt[f.split('.')[-1]])(f, dest)
-        FDF.loc[len(FDF)] = [inst.getCreationDate(), f, inst.buildDestPath()]
+        if (f.split('.')[-1])in list(fileFrmt.keys()):
+            inst = getattr(sys.modules[__name__],fileFrmt[f.split('.')[-1]])(f, dest)
+            FDF.loc[len(FDF)] = [inst.getCreationDate(), f, inst.buildDestPath()]
+        else:
+            FDF.loc[len(FDF)] = ['None', f, dest + 'UNCLASSIFIED' + '/']
     print('Sorting data frame by date ...')
     FDF = FDF.sort_values(by=['date'])
     return FDF
@@ -165,7 +208,7 @@ def copyFilesAcross(lst):
             except OSError as e:
                 print('Failed to copy file ' + row['source'] + ' with error {0}'.format(e) )
             except:
-                print("Unexpected error: ", sys.exc_info()[0])
+                print('Unexpected error: ', sys.exc_info()[0])
 
 def getCmdLineArguments():
     #function to get command line arguments
@@ -204,7 +247,6 @@ if __name__ == "__main__":
     filesDF = createDF(listOfFiles, cmdlineArgs.destDirectory)
     processes = []
     lstOfDates = list(set(filesDF['date'].to_list()))
-    lstOfDates.sort()
     splitListOfDatesForProc = [(lstOfDates[i:i+3]) for i in range(0, len(lstOfDates), 3)]
     for dt in splitListOfDatesForProc:
         p = Process(target=copyFilesAcross, args=([filesDF, dt],))
