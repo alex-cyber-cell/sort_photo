@@ -44,6 +44,7 @@ import pandas as pd
 from multiprocessing import Process, current_process
 
 from PIL import Image
+from pathlib import Path
 
 ########################################################################################################################
 ##     CLASS DEFINITION
@@ -70,7 +71,7 @@ class Photo:
 
     def buildDestPath(self):
         #create a destination path
-        dt = 'UNDATED' if self.cDate is 'None' else self.cDate
+        dt = 'UNDATED' if self.cDate == 'None' else self.cDate
         return self.coreDest + dt + '/'
 
     def getCreationDate(self):
@@ -126,13 +127,21 @@ class Mov:
 ########################################################################################################################
 ##     FUNCTION DEFINITION
 ########################################################################################################################
-def getAvailableSpace():
-    #function to get the available space on target device 
-    print('getAvailableSpace: Executed ...')
+def convertBytesToMb(bytesValue):
+    return (bytesValue / 1000000.0) / 1024.0
+
+def getAvailableSpace(path):
+    #function to get the available space on target device
+    return convertBytesToMb(os.statvfs(path).f_frsize * os.statvfs(path).f_bavail)
     
-def getNecessarySpace():
+def getNecessarySpace(path):
     #function to get the necessary space on target device 
-    print('getNecessarySpace: Executed ...')
+    total_size = 0
+    for dirpath, dirnames, filenames in os.walk(path):
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            total_size += os.path.getsize(fp)
+    return convertBytesToMb(total_size)
     
 def compareSpace():
     #function to compare the necessary and avaialble space
@@ -176,7 +185,13 @@ def copyFilesAcross(lst):
             try:
                 #print('Making directory ' + row['destination'])
                 os.makedirs(row['destination'], exist_ok=True)
-                shutil.copy(row['source'], row['destination'])
+                if not Path(row['destination'] + row['source'].split('/')[-1]).is_file():
+                    shutil.copy(row['source'], row['destination'])
+                else:
+                    dest = '/'.join(row['destination'].split('/')[:-2]) + '/' + 'DUPLICATE/'
+                    os.makedirs(dest, exist_ok=True)
+                    print('File ' + row['source'] + ' is a potential duplicate. Moving it to ' + dest)
+                    shutil.copy(row['source'], dest)
             except OSError as e:
                 print('Failed to copy file ' + row['source'] + ' with error {0}'.format(e) )
             except:
@@ -213,12 +228,20 @@ def getCmdLineArguments():
 if __name__ == "__main__":
     #get command line arguments
     cmdlineArgs = getCmdLineArguments()
+    #check space on destination
+    available_space = getAvailableSpace(cmdlineArgs.destDirectory)
+    required_space = getNecessarySpace(cmdlineArgs.sourceDirectory)
+    if (required_space > available_space):
+        print('Not enough space on target device. Please clear space and try again!')
+        sys.exit()
     #get all the files in folder
     listOfFiles = getFiles(cmdlineArgs.sourceDirectory)
     #create dataframe of files which needs to be copied
     filesDF = createDF(listOfFiles, cmdlineArgs.destDirectory)
+
     processes = []
     lstOfDates = list(set(filesDF['date'].to_list()))
+
     splitListOfDatesForProc = [(lstOfDates[i:i+3]) for i in range(0, len(lstOfDates), 3)]
     for dt in splitListOfDatesForProc:
         p = Process(target=copyFilesAcross, args=([filesDF, dt],))
