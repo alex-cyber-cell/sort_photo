@@ -189,10 +189,17 @@ def copyFilesAcross(lst):
                 if not Path(row['destination'] + row['source'].split('/')[-1]).is_file():
                     shutil.copy(row['source'], row['destination'])
                 else:
-                    dest = '/'.join(row['destination'].split('/')[:-2]) + '/' + 'DUPLICATE/'
-                    os.makedirs(dest, exist_ok=True)
-                    print('File ' + row['source'] + ' is a potential duplicate. Moving it to ' + dest)
-                    shutil.copy(row['source'], dest)
+                    pth = row['destination'] + row['source'].split('/')[-1]
+                    dupSuffix = 1
+                    while Path(pth).is_file():
+                        print(pth + ' already exists! adding suffix')
+                        pthToList = pth.split('/')
+                        newName = str(dupSuffix) + '_' + row['source'].split('/')[-1]
+                        dupSuffix += 1
+                        pthToList[len(pthToList) - 1] = newName
+                        pth = '/'.join(pthToList)
+                    print('New name was set to : ' + pth)
+                    shutil.copy(row['source'], pth)
             except OSError as e:
                 print('Failed to copy file ' + row['source'] + ' with error {0}'.format(e) )
             except:
