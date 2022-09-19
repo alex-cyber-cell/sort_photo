@@ -1,0 +1,81 @@
+\documentclass{article}
+\usepackage[english]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{fancyhdr}
+\usepackage{makecell}
+\usepackage{hyperref}
+\usepackage[T1]{fontenc}
+\usepackage[margin=1 in]{geometry}
+\hypersetup{
+	colorlinks=true,
+	linkcolor=blue,
+	filecolor=magenta,      
+	urlcolor=cyan,
+}
+
+\renewcommand\theadalign{bc}
+
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{July 2020}
+\lhead{Python Script: sortPhoto.py}
+\rfoot{Page \thepage}
+
+\urlstyle{same}
+
+\begin{document}
+
+\section{Summary}
+	\begin{center}
+		\begin{tabular}{ | c | c | c }
+			\hline
+			\textbf{GitHub Link} & \url{https://github.com/rdanutalexandru1993/sort_photo} \\ 
+			\textbf{Function Required} & Log function (class)  \\  
+			\textbf{Function Description} & \thead{Class responsible to print the necessary INFO,\\ WARN, ERROR, DEBUG messages in python}  \\
+			\hline   
+		\end{tabular}
+	\end{center}
+
+\section{How-To}
+	\begin{enumerate}
+		\item Pull from branch 
+			\begin{enumerate}
+				\item Go to \url{https://github.com/rdanutalexandru1993/sort_photo}
+				\item From \textbf{Popular Repositories} select \textbf{sort\char`_photo}
+				\item Go to \textbf{code}, copy link and run \textbf{git clone \char`{link\char`}}
+				\vspace{0.1in}
+				\item[$\ast$] If you don't have git installed go to \url{https://desktop.github.com/} (probs best to install VIM + LINUX $\rightarrow$ \url{https://itsfoss.com/install-linux-in-virtualbox/})
+			\end{enumerate}
+		\item Right click on \textbf{sort\char`_photo.py},open with other application, open with \textbf{PyCharm}
+		\item Go to File > Open File in Project
+		\item Go to Run > Edit Configurations > Parameters and add the following (might be a bit different for windows): 
+		\begin{verbatim}
+			--sourceDir
+			{PATH_FROM}/testdir/from/
+			--destDir
+			{PATH_TO}}/testdir/to/
+		\end{verbatim}
+	\item[$\ast$] you should be able to run the project now
+	\end{enumerate}
+
+\section{Class Design}
+	Class needs to have an \char`_\char`_init\char`_\char`_ method and \textbf{INFO}, \textbf{WARN}, \textbf{ERROR}, \textbf{DEBUG}
+	\begin{itemize}
+		\item \textbf{INFO} $\rightarrow$ should print info messages
+		\item \textbf{WARN} $\rightarrow$ error messages but not critical (script can still run)
+		\item \textbf{ERROR} $\rightarrow$ critical errors that break the script
+		\item \textbf{DEBUG} $\rightarrow$ messages visible only in debug (parameter -debug has been provided)
+	\end{itemize}
+	Class also needs to take a logFile parameter from command line and create the log file in that folder. If parameter is missing $\rightarrow$ create folder \textbf{log} in \textbf{HOME}
+
+\section{Usage}
+	In order to print a message (any message) function should be called like this: 
+	\begin{verbatim}
+		log.INFO("This is an info message")
+	\end{verbatim}
+
+\section{Example Output}
+	\begin{verbatim}
+		[INFO]|2020.07.24D23:32:40.278004000|This is an info message
+	\end{verbatim}
+\end{document}
