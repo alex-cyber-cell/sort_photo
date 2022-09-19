@@ -11,9 +11,9 @@
 ########################################################################################################################
 ##     USEFUL LINKS
 ########################################################################################################################
-#Logging - https://www.toptal.com/python/in-depth-python-logging
-#Tags for exif - https://pillow.readthedocs.io/en/stable/_modules/PIL/TiffTags.html?highlight=datetime
-#Tags definition for exif - https://www.awaresystems.be/imaging/tiff/tifftags/datetime.html
+# Logging - https://www.toptal.com/python/in-depth-python-logging
+# Tags for exif - https://pillow.readthedocs.io/en/stable/_modules/PIL/TiffTags.html?highlight=datetime
+# Tags definition for exif - https://www.awaresystems.be/imaging/tiff/tifftags/datetime.html
 
 
 ########################################################################################################################
@@ -40,8 +40,9 @@ fileFrmt = {'jpg'  : 'Photo',
 ##     IMPORTS
 ########################################################################################################################
 
-import sys, getopt, logging, argparse, os, datetime, shutil, pymediainfo
+import sys, getopt, logging, argparse, os, datetime, shutil, pymediainfo, re
 import pandas as pd
+import dateutil.parser as dparser
 from multiprocessing import Process, current_process
 
 from PIL import Image
@@ -70,9 +71,22 @@ class Photo:
         self.cDate = self.getCreationDate()
         self.itemDest = self.buildDestPath()
 
+    def getDateFromName(self, fname): 
+        fileName = fname.split('/')[-1]
+        fileName = re.sub(r"-[A-Z][A-Z][0-9][0-9][0-9][0-9]", "", fileName)
+        try:
+            dt = dparser.parse(fileName,fuzzy=True).strftime("%Y%m%d")
+        except: 
+            print('Failed to parse time from fileName : ' + fileName)
+            dt = 'None'
+
+        return dt
+
     def buildDestPath(self):
         #create a destination path
-        dt = 'UNDATED' if self.cDate == 'None' else self.cDate
+        # dt = 'UNDATED' if self.cDate == 'None' else self.cDate
+        dt = 'UNDATED' if self.cDate == 'None' else self.cDate[:-2]
+       
         return self.coreDest + dt + '/'
 
     def getCreationDate(self):
@@ -84,7 +98,9 @@ class Photo:
         try:
             exifData = Image.open(self.itemSource)._getexif()
         except:
-            return 'None'
+            dt = self.getDateFromName(self.itemSource)
+
+            return dt
 
         tag = None
 
@@ -98,9 +114,16 @@ class Photo:
             else:
                 tag = None
 
-            return 'None' if tag is None else exifData[tag].split(' ')[0].replace(':', '')
+            dt = 'None' if tag is None else exifData[tag].split(' ')[0].replace(':', '')
+            
+            if dt == 'None': 
+                dt = self.getDateFromName(self.itemSource)
+
+            return dt 
         else:
-            return 'None'
+            dt = self.getDateFromName(self.itemSource)
+
+            return dt
 
 class Mov:
     def __init__(self, path, dest):
@@ -138,10 +161,12 @@ def getAvailableSpace(path):
 def getNecessarySpace(path):
     #function to get the necessary space on target device 
     total_size = 0
+    
     for dirpath, dirnames, filenames in os.walk(path):
         for f in filenames:
             fp = os.path.join(dirpath, f)
             total_size += os.path.getsize(fp)
+    
     return convertBytesToMb(total_size)
     
 def compareSpace():
@@ -150,29 +175,36 @@ def compareSpace():
 
 def getFiles(src):
     #function to generate a list of files that we need to sort
+    
     print('getFiles: Executed ...')
     print('getFiles: Creating empty list ...')
     LOF = []
+    
     print('getFiles: Concatenating files ...')
     for root, subdirs, files in os.walk(src):
         for fl in files:
             LOF.append('/'.join([root,fl]))
+    
     return LOF
 
 def createDF(LOF, dest):
     print('Creating dataframe of files to be copied ...')
     dfCols = ['date', 'source', 'destination']
+
     print('Creating empty dataframe ...')
     FDF = pd.DataFrame(columns = dfCols)
+    
     print('Populating dataframe ...')
     for f in LOF:
         if (f.split('.')[-1])in list(fileFrmt.keys()):
             inst = getattr(sys.modules[__name__],fileFrmt[f.split('.')[-1]])(f, dest)
-            FDF.loc[len(FDF)] = [inst.getCreationDate(), f, inst.buildDestPath()]
+            FDF.loc[len(FDF)] = [inst.getCreationDate(), os.path.normpath(f), inst.buildDestPath()]
         else:
             FDF.loc[len(FDF)] = ['None', f, dest + 'UNCLASSIFIED' + '/']
+    
     print('Sorting data frame by date ...')
     FDF = FDF.sort_values(by=['date'])
+    
     return FDF
 
 def copyFilesAcross(lst):
@@ -192,7 +224,7 @@ def copyFilesAcross(lst):
                     pth = row['destination'] + row['source'].split('/')[-1]
                     dupSuffix = 1
                     while Path(pth).is_file():
-                        print(pth + ' already exists! adding suffix')
+                        print(pth + ' already exists! adding prefix')
                         pthToList = pth.split('/')
                         newName = str(dupSuffix) + '_' + row['source'].split('/')[-1]
                         dupSuffix += 1
@@ -246,6 +278,10 @@ if __name__ == "__main__":
     listOfFiles = getFiles(cmdlineArgs.sourceDirectory)
     #create dataframe of files which needs to be copied
     filesDF = createDF(listOfFiles, cmdlineArgs.destDirectory)
+
+    dfLocation = os.getcwd() + '/dataframe.csv'
+    print('Saving dataframe ' + dfLocation)
+    filesDF.to_csv(dfLocation, index=False)
 
     processes = []
     lstOfDates = list(set(filesDF['date'].to_list()))
